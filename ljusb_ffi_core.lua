@@ -162,6 +162,14 @@ typedef int (LIBUSB_CALL *libusb_hotplug_callback_fn)(struct libusb_context *ctx
 						struct libusb_device *device,
 						libusb_hotplug_event event,
 						void *user_data);
+
+
+
+typedef void (LIBUSB_CALL *libusb_log_cb)(struct libusb_context *ctx,
+ 	 enum libusb_log_level level, const char *str);
+
+void LIBUSB_CALL libusb_set_log_cb(struct libusb_context *ctx, libusb_log_cb cb, int mode);
+
 ]], 'LIBUSB_CALL', jit.os == 'Windows' and '__stdcall' or '')))
 
 ffi.cdef[[
@@ -688,4 +696,3 @@ assert(st, "libusb_get_version call failed (make sure libusb-1.0 is present and 
 assert(major == 1, "libusb version mismatch (need libusb-1.x.x)")
 
 return lib
-  

@@ -51,11 +51,31 @@ local ctx_methods = {
     return trf
   end,
 
-  pool = function(usb)
+  pool = function(usb, time_seconds)
     local tv = ffi.new'timeval[1]'
-    tv[0].tv_sec = 0
+    tv[0].tv_sec = time_seconds or 0
     tv[0].tv_usec = 0
     usb:libusb_handle_events_timeout_completed(tv, nil)
+  end,
+
+  get_version = function(usb)
+    local v = usb.libusb_get_version()
+    return string.format("libusb v%i.%i.%i.%i", v.major, v.minor, v.micro, v.nano)
+  end,
+
+  set_log_level = function(usb, level)
+    core.libusb_set_debug(usb, level)
+  end,
+  has_log_callback = function(usb)
+    local v = usb.libusb_get_version()
+    return v.micro >= 23
+  end,
+  set_log_callback = function(usb, callback)
+    local usb_cb = new('libusb_log_cb', function(ctx, level, str)
+      local text = ffi.string(str)
+      cb(level, text)
+    end)
+    core.libusb_set_log_cb(usb, usb_cb, core.LIBUSB_LOG_CB_CONTEXT)
   end,
 }
 
