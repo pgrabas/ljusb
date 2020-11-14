@@ -18,10 +18,6 @@ function usb_transfer.control_setup(t, bmRequestType, bRequest, wValue, wIndex, 
 --data is optional and only applies on host-to-device transfers
     local len = ffi.C.LIBUSB_CONTROL_SETUP_SIZE + wLength
 
-    print("wValue " .. type(wValue) .. " - " .. tostring(wValue))
-    print("wIndex/dev/bus/usb/001/009: " .. type(wIndex) .. " - " .. tostring(wIndex))
-    print("wLength " .. type(wLength) .. " - " .. tostring(wLength))
-
     if t.length < len then
         t.buffer = ffi.C.realloc(t.buffer, len)
         assert(len == 0 or t.buffer ~= nil, "out of memory")
