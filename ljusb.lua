@@ -56,7 +56,6 @@ local ctx_methods = {
     tv[0].tv_sec = 0
     tv[0].tv_usec = 0
     usb:libusb_handle_events_timeout_completed(tv, nil)
-    end
   end,
 }
 
@@ -94,11 +93,11 @@ metatype('struct libusb_transfer', {
     end,
     submit = function(t, dev_hnd, cb, timeout)
       t.dev_handle = dev_hnd
-      t.callback = new('libusb_transfer_cb_fn', function(trf) cb(trf) end
+      t.callback = new('libusb_transfer_cb_fn', function(trf) cb(trf) end)
       t.timeout = timeout or 0
       local err = core.libusb_submit_transfer(t)
       if err ~= C.LIBUSB_SUCCESS then
-        print('transfer submit error : ' .. ffi.string(core.libusb_error_name(err))
+        print('transfer submit error - ' .. ffi.string(core.libusb_error_name(err)))
         return nil, ffi.string(core.libusb_error_name(err))
       end
       return t
