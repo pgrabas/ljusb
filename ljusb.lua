@@ -1,7 +1,6 @@
 local ffi = require'ffi'
 local bit = require'bit'
 local core = require'ljusb_ffi_core'
-local sched = require'lumen.sched'
 
 local bor, band, lshift, rshift = bit.bor, bit.band, bit.lshift, bit.rshift
 local new, typeof, metatype = ffi.new, ffi.typeof, ffi.metatype
@@ -27,22 +26,11 @@ local libusb_cpu_to_le16 = function(i)
   end
 end
 
-local tv = ffi.new'timeval[1]'
-tv[0].tv_sec = 0
-tv[0].tv_usec = 0
-local event_handler = function(usb)
-  jit.off(true, true)
-  while true do
-    usb:libusb_handle_events_timeout_completed(tv, nil)
-    sched.wait()
-  end
-end
-
 --contains Lua-implementations of all the libusb static-inline
 --functions, plus the higher level Lua API
-local methods = {
+local ctx_methods = {
   libusb_cpu_to_le16 = libusb_cpu_to_le16,
-  
+
   libusb_fill_control_transfer = function(trf, dev_hnd, buffer, cb, user_data, timeout)
     local setup = cast(libusb_control_setup_ptr, buffer)
     trf.dev_handle = dev_hnd
@@ -58,42 +46,32 @@ local methods = {
     trf.callback = cb
   end,
 
-  Transfer = function(iso_cnt)
+  transfer = function(iso_cnt)
     local trf = core.libusb_alloc_transfer(iso_cnt or 0)
-    
     return trf
   end,
-  
-  start_event_handler = function(usb)
-    --never jit compile this function
-    jit.off(true, true)
-    return sched.run(event_handler, usb)
+
+  pool = function(usb)
+    local tv = ffi.new'timeval[1]'
+    tv[0].tv_sec = 0
+    tv[0].tv_usec = 0
+    usb:libusb_handle_events_timeout_completed(tv, nil)
+    end
   end,
 }
 
 metatype('struct libusb_context', {
   __index = function(_, k)
-    return methods[k] or core[k]
+    return ctx_methods[k] or core[k]
   end,
 })
-
-local intptr_t = typeof'intptr_t'
-
---use transfer memory address as unique signal
-local addressof = function(t)
-  return tonumber(cast(intptr_t, t))
-end
-
-local scheduler_transfer_complete_cb = new('libusb_transfer_cb_fn', function(trf)
-  sched.schedule_signal(addressof(trf), trf)
-end)
 
 metatype('struct libusb_transfer', {
   __index = {
     control_setup = function(t, bmRequestType, bRequest, wValue, wIndex, wLength, data)
       --data is optional and only applies on host-to-device transfers
-      local len = 8 + wLength
-      
+      local len = C.LIBUSB_CONTROL_SETUP_SIZE + wLength
+
       if t.length < len then
         t.buffer = C.realloc(t.buffer, len)
         assert(len == 0 or t.buffer ~= nil, "out of memory")
@@ -107,30 +85,27 @@ metatype('struct libusb_transfer', {
       t.buffer[5] = band(rshift(wIndex, 8), 0xff)
       t.buffer[6] = band(wLength, 0xff)
       t.buffer[7] = band(rshift(wLength, 8), 0xff)
-      
+
       if data ~= nil and band(bmRequestType, 0x80) == 0 then
         --host to device transfer with data
         copy(t.buffer + C.LIBUSB_CONTROL_SETUP_SIZE, data, wLength)
       end
       return t
     end,
-    event_any = function(t)
-      return addressof(t)
-    end,
-    submit = function(t, dev_hnd, timeout)
+    submit = function(t, dev_hnd, cb, timeout)
       t.dev_handle = dev_hnd
-      t.callback = scheduler_transfer_complete_cb
+      t.callback = new('libusb_transfer_cb_fn', function(trf) cb(trf) end
       t.timeout = timeout or 0
       local err = core.libusb_submit_transfer(t)
       if err ~= C.LIBUSB_SUCCESS then
-        io.write'transfer submit error'
+        print('transfer submit error : ' .. ffi.string(core.libusb_error_name(err))
         return nil, ffi.string(core.libusb_error_name(err))
       end
       return t
     end,
   },
   __gc = function(t)
-    print"collecting transfer"
+    print("collecting transfer")
     core.libusb_free_transfer(t)
   end,
 })
