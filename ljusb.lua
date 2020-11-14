@@ -85,49 +85,8 @@ metatype('struct libusb_context', {
   end,
 })
 
-metatype('struct libusb_transfer', {
-  __index = {
-    control_setup = function(t, bmRequestType, bRequest, wValue, wIndex, wLength, data)
-      --data is optional and only applies on host-to-device transfers
-      local len = C.LIBUSB_CONTROL_SETUP_SIZE + wLength
-
-      if t.length < len then
-        t.buffer = C.realloc(t.buffer, len)
-        assert(len == 0 or t.buffer ~= nil, "out of memory")
-      end
-      t.length = len
-      t.buffer[0] = bmRequestType
-      t.buffer[1] = bRequest
-      t.buffer[2] = band(wValue, 0xff)
-      t.buffer[3] = band(rshift(wValue, 8), 0xff)
-      t.buffer[4] = band(wIndex, 0xff)
-      t.buffer[5] = band(rshift(wIndex, 8), 0xff)
-      t.buffer[6] = band(wLength, 0xff)
-      t.buffer[7] = band(rshift(wLength, 8), 0xff)
-
-      if data ~= nil and band(bmRequestType, 0x80) == 0 then
-        --host to device transfer with data
-        copy(t.buffer + C.LIBUSB_CONTROL_SETUP_SIZE, data, wLength)
-      end
-      return t
-    end,
-    submit = function(t, dev_hnd, cb, timeout)
-      t.dev_handle = dev_hnd
-      t.callback = new('libusb_transfer_cb_fn', function(trf) cb(trf) end)
-      t.timeout = timeout or 0
-      local err = core.libusb_submit_transfer(t)
-      if err ~= C.LIBUSB_SUCCESS then
-        print('transfer submit error - ' .. ffi.string(core.libusb_error_name(err)))
-        return nil, ffi.string(core.libusb_error_name(err))
-      end
-      return t
-    end,
-  },
-  __gc = function(t)
-    print("collecting transfer")
-    core.libusb_free_transfer(t)
-  end,
-})
+require "usb-device-handle"
+require "usb-transfer"
 
 local ctxptr = new'libusb_context *[1]'
 if 0 ~= core.libusb_init(ctxptr) then
