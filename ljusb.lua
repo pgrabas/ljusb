@@ -139,6 +139,6 @@ local ctxptr = new'libusb_context *[1]'
 if 0 ~= core.libusb_init(ctxptr) then
   return nil, "failed to initialize usb library"
 end
-local ctx = new('struct libusb_context *', ctxptr[1])
+local ctx = new('struct libusb_context *', ctxptr[0])
 
 return ctx
