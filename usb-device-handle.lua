@@ -1,4 +1,4 @@
-local core = require'ljusb_ffi_core'
+local core = require'ljusb/ljusb_ffi_core'
 local ffi = require'ffi'
 
 local usb_device_handle = {}

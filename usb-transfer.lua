@@ -1,4 +1,4 @@
-local core = require'ljusb_ffi_core'
+local core = require'ljusb/ljusb_ffi_core'
 local ffi = require'ffi'
 local bit = require'bit'
 
@@ -17,6 +17,10 @@ ffi.metatype('struct libusb_transfer', {
 function usb_transfer.control_setup(t, bmRequestType, bRequest, wValue, wIndex, wLength, data)
 --data is optional and only applies on host-to-device transfers
     local len = ffi.C.LIBUSB_CONTROL_SETUP_SIZE + wLength
+
+    print("wValue " .. type(wValue) .. " - " .. tostring(wValue))
+    print("wIndex/dev/bus/usb/001/009: " .. type(wIndex) .. " - " .. tostring(wIndex))
+    print("wLength " .. type(wLength) .. " - " .. tostring(wLength))
 
     if t.length < len then
         t.buffer = ffi.C.realloc(t.buffer, len)
@@ -46,7 +50,7 @@ function usb_transfer.submit(t, dev_hnd, cb, timeout)
     local err = core.libusb_submit_transfer(t)
     if err ~= ffi.C.LIBUSB_SUCCESS then
         print('transfer submit error - ' .. ffi.string(core.libusb_error_name(err)))
-        return nil, ffi.string(core.libusb_error_name(err))
+        return false, ffi.string(core.libusb_error_name(err))
     end
-    return t
+    return true
 end

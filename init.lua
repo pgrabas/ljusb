@@ -1,6 +1,6 @@
 local ffi = require'ffi'
 local bit = require'bit'
-local core = require'ljusb_ffi_core'
+local core = require'ljusb/ljusb_ffi_core'
 
 local bor, band, lshift, rshift = bit.bor, bit.band, bit.lshift, bit.rshift
 local new, typeof, metatype = ffi.new, ffi.typeof, ffi.metatype
@@ -77,6 +77,19 @@ local ctx_methods = {
     end)
     core.libusb_set_log_cb(usb, usb_cb, core.LIBUSB_LOG_CB_CONTEXT)
   end,
+
+  -- get_device_list = function(usb)
+  --     local array = new'libusb_device **[1]'
+  --     local count = core.libusb_get_device_list(usb, array)
+
+  --     print("COUNT " .. tostring(count))
+
+  --     core.libusb_free_device_list(array)
+  -- end,
+
+  error_str = function(code)
+    return ffi.string(core.libusb_error_name(code))
+  end,
 }
 
 metatype('struct libusb_context', {
@@ -85,8 +98,8 @@ metatype('struct libusb_context', {
   end,
 })
 
-require "usb-device-handle"
-require "usb-transfer"
+require "ljusb/usb-device-handle"
+require "ljusb/usb-transfer"
 
 local ctxptr = new'libusb_context *[1]'
 if 0 ~= core.libusb_init(ctxptr) then
