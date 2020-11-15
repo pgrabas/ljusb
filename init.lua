@@ -26,6 +26,9 @@ local libusb_cpu_to_le16 = function(i)
   end
 end
 
+local transfer_mt = require "ljusb/usb-transfer"
+
+
 --contains Lua-implementations of all the libusb static-inline
 --functions, plus the higher level Lua API
 local ctx_methods = {
@@ -46,10 +49,7 @@ local ctx_methods = {
     trf.callback = cb
   end,
 
-  transfer = function(iso_cnt)
-    local trf = core.libusb_alloc_transfer(iso_cnt or 0)
-    return trf
-  end,
+  transfer = transfer_mt.__new,
 
   pool = function(usb, time_seconds)
     local tv = ffi.new'timeval[1]'
@@ -99,7 +99,6 @@ metatype('struct libusb_context', {
 })
 
 require "ljusb/usb-device-handle"
-require "ljusb/usb-transfer"
 
 local ctxptr = new'libusb_context *[1]'
 if 0 ~= core.libusb_init(ctxptr) then
