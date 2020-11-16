@@ -3,33 +3,41 @@ local ffi = require'ffi'
 local bit = require'bit'
 
 ffi.cdef[[
-typedef struct usb_transfer {
+typedef struct ljusb_transfer {
     struct libusb_transfer *handle;
-} usb_transfer;
+} ljusb_transfer;
 ]]
+
+ffi.metatype('struct ljusb_transfer', {
+    __gc = function(t)
+        if t.handle.callback ~= nil then
+            t.handle.callback:free()
+        end
+        core.libusb_free_transfer(t.handle)
+    end
+})
 
 local usb_transfer = {}
 usb_transfer.__index = usb_transfer
-ffi.metatype('struct usb_transfer', usb_transfer)
-
-function usb_transfer.__gc(t)
-    -- print("collecting transfer")
-    if t.handle.callback ~= nil then
-        t.handle.callback:free()
-    end
-    core.libusb_free_transfer(t.handle)
-end
 
 function usb_transfer.__new(iso_cnt)
-    local transfer = ffi.new("usb_transfer")
-    transfer.handle = core.libusb_alloc_transfer(iso_cnt or 0)
-    return transfer
+    local tr = {
+        ljusb_transfer = ffi.new("ljusb_transfer")
+    }
+    tr.ljusb_transfer.handle = core.libusb_alloc_transfer(iso_cnt or 0)
+    return setmetatable(tr, usb_transfer)
+end
+
+function usb_transfer:get_raw_handle()
+    local h = self.ljusb_transfer.handle
+    assert(h ~= nil)
+    return h
 end
 
 function usb_transfer:control_setup(bRequestType, bRequest, wValue, wIndex, data)
     self:set_data(data)
 
-    local t = self.handle
+    local t = self:get_raw_handle()
     t.buffer[0] = bRequestType
     t.buffer[1] = bRequest
     t.buffer[2] = bit.band(wValue, 0xff)
@@ -41,7 +49,7 @@ function usb_transfer:control_setup(bRequestType, bRequest, wValue, wIndex, data
 end
 
 function usb_transfer:data()
-    local t = self.handle
+    local t = self:get_raw_handle()
     if t.actual_length == 0 then
         return ""
     end
@@ -49,7 +57,7 @@ function usb_transfer:data()
 end
 
 function usb_transfer:set_data(data)
-    local t = self.handle
+    local t = self:get_raw_handle()
 
     if data == nil and t.length >= ffi.C.LIBUSB_CONTROL_SETUP_SIZE then
         return
@@ -74,7 +82,6 @@ function usb_transfer:set_data(data)
         ffi.copy(t.buffer + ffi.C.LIBUSB_CONTROL_SETUP_SIZE, data, data:len())
     end
 
-    local t = self.handle
     t.length = len
     t.actual_length = data:len()
     t.buffer[6] = bit.band(data_len, 0xff)
@@ -99,12 +106,13 @@ function usb_transfer:pack_data(fmt, ...)
 end
 
 function usb_transfer:submit(dev_hnd, cb, timeout)
-    local t = self.handle
-    t.dev_handle = dev_hnd
+    local t = self:get_raw_handle()
+    t.dev_handle = dev_hnd:get_raw_handle()
     t.callback = ffi.new('libusb_transfer_cb_fn', function()
         cb(self)
-        self.handle.callback:free()
-        self.handle.callback = nil
+        local t = self:get_raw_handle()
+        t.callback:free()
+        t.callback = nil
     end)
     t.timeout = timeout or 0
     local err = core.libusb_submit_transfer(t)
