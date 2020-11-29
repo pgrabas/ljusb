@@ -59,11 +59,7 @@ function usb_device:get_device_port_numbers_string(dev)
     if not path then
         return nil, err
     end
-    local s = {}
-    for _,v in ipairs(path) do
-        table.insert(s, tostring(v))
-    end
-    return table.concat(s, ".")
+    return table.concat(path, ".")
 end
 
 function usb_device:get_raw_handle()
@@ -92,7 +88,7 @@ end
 
 function usb_device:get_vid_pid()
     local d = self:get_descriptor()
-    return { vid=d.idVendoridVendor, pid=d.idProduct }
+    return { vid=d.idVendor, pid=d.idProduct }
 end
 
 function usb_device:get_product_manufacturer_serial()

@@ -1,10 +1,6 @@
 local core = require'ljusb/ljusb_ffi_core'
 local ffi = require'ffi'
 
-local function error_str(code)
-	return ffi.string(core.libusb_error_name(code))
-end
-
 ffi.cdef[[
 typedef struct ljusb_device_handle {
     struct libusb_device_handle *handle[1];
@@ -65,7 +61,6 @@ function usb_device_handle:get_string_descriptor_ascii(index)
     end
     return ffi.string(buffer, r)
 end
-
 
 function usb_device_handle:get_device()
     if self.device then
